@@ -387,15 +387,24 @@ class ZabbixSender(object):
         for host_addr in self.zabbix_uri:
             logger.debug('Sending data to %s', host_addr)
 
-            try:
+            connection_ = None
+            if not connection_:
                 # IPv4
-                connection_ = socket.socket(socket.AF_INET)
-            except socket.error:
+                try:
+                    connection_ = socket.socket(socket.AF_INET)
+                except socket.error:
+                    pass
+
+            if not connection_:
                 # IPv6
                 try:
                     connection_ = socket.socket(socket.AF_INET6)
                 except socket.error:
-                    raise Exception("Error creating socket for {host_addr}".format(host_addr=host_addr))
+                    pass
+
+            if not connection_:
+                raise Exception("Error creating socket for {host_addr}".format(host_addr=host_addr))
+
             if self.socket_wrapper:
                 connection = self.socket_wrapper(connection_)
             else:
@@ -411,13 +420,13 @@ class ZabbixSender(object):
                 logger.error('Sending failed: Connection to %s timed out after'
                              '%d seconds', host_addr, self.timeout)
                 connection.close()
-                raise socket.timeout
+                raise
             except socket.error as err:
                 # In case of error we should close connection, otherwise
                 # we will close it after data will be received.
                 logger.warning('Sending failed: %s', getattr(err, 'msg', str(err)))
                 connection.close()
-                raise err
+                raise
 
             response = self._get_response(connection)
             logger.debug('%s response: %s', host_addr, response)
